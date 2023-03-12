@@ -67,6 +67,7 @@ batch_size = 6 # data num = batch size x Iteration
 max_pred = 5 # max tokens of prediction
 n_layers = 6 # number of encoder layer
 n_heads = 12 # MultiHeadAttention
+# Hidden State Size就是我們所說的詞嵌入的維度，它是由模型在預訓練階段即規定好的。Hidden State Size越大代表抽取的特徵越多，運算耗費時間更久，但也更有可能獲得更好的效果。BERT的Base版模型的Hidden State Size為768，Large版本則為1024。
 d_model = 768 # the dimension of token embedding 、 Segment Embeddings、Position Embedding
 d_ff = 768*4  # 4*d_model, FeedForward dimension
 d_k = d_v = 64  # dimension of K(=Q), V ; Q dot K = attn x V
@@ -208,27 +209,28 @@ def gelu(x):
 class Embedding(nn.Module):
   def __init__(self):
     super(Embedding, self).__init__()
-    self.tok_embed = nn.Embedding(vocab_size, d_model)  # token embedding
-    self.pos_embed = nn.Embedding(maxlen, d_model)  # position embedding
+    self.tok_embed = nn.Embedding(vocab_size, d_model)  # token embedding : (num_embeddings(the word number of sentence) , embedding_dim)
+    self.pos_embed = nn.Embedding(maxlen, d_model)  # position embedding : (the max token in a sentence , embedding_dim)
     self.seg_embed = nn.Embedding(n_segments, d_model)  # segment(token type) embedding
     self.norm = nn.LayerNorm(d_model)
 
-  def forward(self, x, seg):
+  def forward(self, x, seg): # x = tensor 
     seq_len = x.size(1)
-    pos = torch.arange(seq_len, dtype=torch.long)
-    pos = pos.unsqueeze(0).expand_as(x)  # [seq_len] -> [batch_size, seq_len]
+    pos = torch.arange(seq_len, dtype=torch.long) # tensor([0,1,2,...,seq_len-1])
+    pos = pos.unsqueeze(0).expand_as(x)  # [seq_len] -> [batch_size, [seq_len]]
     embedding = self.tok_embed(x) + self.pos_embed(pos) + self.seg_embed(seg)
-    return self.norm(embedding)
+    return self.norm(embedding) # why
 
 
 class ScaledDotProductAttention(nn.Module):
+  # matmul -> scale -> mask -> softmax -> matmul
   def __init__(self):
     super(ScaledDotProductAttention, self).__init__()
 
   def forward(self, Q, K, V, attn_mask):
     scores = torch.matmul(Q, K.transpose(-1, -2)) / np.sqrt(d_k)  # scores : [batch_size, n_heads, seq_len, seq_len]
     scores.masked_fill_(attn_mask, -1e9)  # Fills elements of self tensor with value where mask is one.
-    attn = nn.Softmax(dim=-1)(scores)
+    attn = nn.Softmax(dim=-1)(scores) # also can set dim = 2, make a softmax of each dimension row
     context = torch.matmul(attn, V)
     return context
 
@@ -236,7 +238,7 @@ class ScaledDotProductAttention(nn.Module):
 class MultiHeadAttention(nn.Module):
   def __init__(self):
     super(MultiHeadAttention, self).__init__()
-    self.W_Q = nn.Linear(d_model, d_k * n_heads)
+    self.W_Q = nn.Linear(d_model, d_k * n_heads) # in_feature , out_feature
     self.W_K = nn.Linear(d_model, d_k * n_heads)
     self.W_V = nn.Linear(d_model, d_v * n_heads)
 
@@ -252,9 +254,10 @@ class MultiHeadAttention(nn.Module):
 
     # context: [batch_size, n_heads, seq_len, d_v], attn: [batch_size, n_heads, seq_len, seq_len]
     context = ScaledDotProductAttention()(q_s, k_s, v_s, attn_mask)
+    # make a right format
     context = context.transpose(1, 2).contiguous().view(batch_size, -1,
                                                         n_heads * d_v)  # context: [batch_size, seq_len, n_heads * d_v]
-    output = nn.Linear(n_heads * d_v, d_model)(context)
+    output = nn.Linear(n_heads * d_v, d_model)(context) # after concat
     return nn.LayerNorm(d_model)(output + residual)  # output: [batch_size, seq_len, d_model]
 
 
@@ -266,17 +269,18 @@ class PoswiseFeedForwardNet(nn.Module):
 
   def forward(self, x):
     # (batch_size, seq_len, d_model) -> (batch_size, seq_len, d_ff) -> (batch_size, seq_len, d_model)
-    return self.fc2(gelu(self.fc1(x)))
+    return self.fc2(gelu(self.fc1(x))) # in original, w2(relu(w1(layer_norm(x))+b1))+b2 , here x has been Layer_Norm
 
 
 class EncoderLayer(nn.Module):
+  # MultiHead Attention -> Add & Norm -> Feed Forward -> Add & Norm
   def __init__(self):
     super(EncoderLayer, self).__init__()
     self.enc_self_attn = MultiHeadAttention()
     self.pos_ffn = PoswiseFeedForwardNet()
 
   def forward(self, enc_inputs, enc_self_attn_mask):
-    enc_outputs = self.enc_self_attn(enc_inputs, enc_inputs, enc_inputs, enc_self_attn_mask)  # enc_inputs to same Q,K,V
+    enc_outputs = self.enc_self_attn(enc_inputs, enc_inputs, enc_inputs, enc_self_attn_mask)  # enc_inputs to same Q,K,V, original parameter is(Q,K,V,attn_mask)
     enc_outputs = self.pos_ffn(enc_outputs)  # enc_outputs: [batch_size, seq_len, d_model]
     return enc_outputs
 
@@ -284,9 +288,10 @@ class EncoderLayer(nn.Module):
 class BERT(nn.Module):
   def __init__(self):
     super(BERT, self).__init__()
-    self.embedding = Embedding()
+    self.embedding = Embedding() #word + pos embed
     self.layers = nn.ModuleList([EncoderLayer() for _ in range(n_layers)])
-    self.fc = nn.Sequential(
+    # extra for endoer of Transformer
+    self.fc = nn.Sequential( 
       nn.Linear(d_model, d_model),
       nn.Dropout(0.5),
       nn.Tanh(),
@@ -296,7 +301,7 @@ class BERT(nn.Module):
     self.activ2 = gelu
     # fc2 is shared with embedding layer
     embed_weight = self.embedding.tok_embed.weight
-    self.fc2 = nn.Linear(d_model, vocab_size, bias=False)
+    self.fc2 = nn.Linear(d_model, vocab_size, bias=False) # vocab_size is the total word number in a sentence
     self.fc2.weight = embed_weight
 
   def forward(self, input_ids, segment_ids, masked_pos):
