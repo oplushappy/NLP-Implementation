@@ -1,6 +1,27 @@
 import torch
 import torch.nn as nn
 import math
+class WordEmbedding(nn.Module):
+  """
+  make a word vector of d_model dimension , input it to encoder
+  """
+  def __init__(self, vocab_size, d_model):
+    """
+
+    :param vocab_size: the length of dictionary
+    :param d_model: the dimension of word vector
+    """
+    super.__init__()
+    self.d_model = d_model
+    #字典中有vocab_size個詞，慈向量維度是d_model,每個詞會被映射成d_model維度向量
+    self.embedding = nn.Embedding(vocab_size, d_model)
+    self.embed = self.embedding
+
+  def forward(self, x):
+    return self.embed(x) * math.sqrt(self.d_model)
+
+
+
 
 class PositionalEncoding(nn.Module):
   def __init__(self, dim, dropout, max_len=1000):

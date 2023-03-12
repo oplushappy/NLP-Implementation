@@ -48,7 +48,7 @@ class Decoder(nn.module):
     super().__init__()
     self.decoder_layer_list = clone_module_to_modulelist(decoder_layer, n_layers)
 
-  def forward(self, x, memory,trg_mask):
+  def forward(self, x, memory, trg_mask):
     """
 
     :param x:
