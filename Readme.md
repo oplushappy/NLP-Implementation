@@ -2,7 +2,7 @@
 The following are the websites I referred to:
 1. [github Nlp-toturial](https://github.com/graykode/nlp-tutorial/blob/master/5-2.BERT/BERT.py)
 2. [Bert model toturial in chinese](https://www.bilibili.com/video/BV1Kb4y187G6?p=2&vd_source=eedb40643793ea7852c5f0638ff5932c)
-3. [Let's build GPT: from scratch, in code, spelled out.](htps://www.youtube.com/watch?v=kCc8FmEb1nY&ab_channel=AndrejKarpathy)
+3. [Let's build GPT: from scratch, in code, spelled out.](https://www.youtube.com/watch?v=kCc8FmEb1nY&ab_channel=AndrejKarpathy)
 4. [Gpt introduce and implemention](https://blog.csdn.net/weixin_44599230/article/details/124103879)
 
 ### Goal
