@@ -27,4 +27,4 @@ use
 python detect.py
 ```
 demo
-[effect](Gpt-tiny/Snipaste_2023-03-16_23-05-41.png)
+![effect](Gpt-tiny/Snipaste_2023-03-16_23-05-41.png)
